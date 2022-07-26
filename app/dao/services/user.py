@@ -1,13 +1,17 @@
 import base64
 import hashlib
 import hmac
+
+from werkzeug.exceptions import MethodNotAllowed
+
 from app.dao.models.user import User
 from app.dao.services.base import BaseService
+from app.dao.services.exceptions import UserNotFound
 from app.dao.user import UserDAO
 from flask import current_app
 
 
-class UserService(BaseService[UserDAO]):
+class UserService(BaseService):
 
     def get_by_email(self, email: str) -> User:
         user = self.dao.get_by_email(email)
@@ -25,9 +29,13 @@ class UserService(BaseService[UserDAO]):
         user['password'] = self.get_hash(user['password'])
         self.dao.create(user)
 
-    def update_user_info(self, data: str, email: str) -> None:
-        self.get_by_email(email)
-        self.dao.update_by_email(data, email)
+    def update_user_info(self, data: dict, email: str) -> None:
+        if not self.get_by_email(email):
+            raise UserNotFound
+        if 'password' not in data.keys() and 'email' not in data.keys():
+            self.dao.update_by_email(data, email)
+        else:
+            raise MethodNotAllowed
 
     def compare_passwords(self, password_hash: str, other_password: str) -> bool:
         hash_digest = base64.b64encode(hashlib.pbkdf2_hmac(
@@ -42,4 +50,17 @@ class UserService(BaseService[UserDAO]):
     def update_passwords(self, email: str, password_old: str, password_new: str) -> None:
         user = self.get_by_email(email)
         data = {'password': self.get_hash(password_new)}
-        self.dao.update_by_email(data)
+        self.dao.update_by_email(data, email)
+
+    def update_password(self, data: dict, email: str) -> None:
+        user = self.get_by_email(email)
+        current_password = data.get('old_password')
+        new_password = data.get('new_password')
+
+        if None in [current_password, new_password]:
+            raise MethodNotAllowed
+        data = {
+            'password': self.get_hash(current_password)
+
+        }
+        self.dao.update_by_email(data, email)

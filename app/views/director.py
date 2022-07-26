@@ -1,8 +1,8 @@
 from flask import request, jsonify
-from flask_restx import Namespace, Resource
+from flask_restx import Namespace, Resource, abort
 from app.container import director_service
 from app.dao.models.director import DirectorSchema
-from app.decorators import auth_required, admin_required
+from app.dao.services.exceptions import ItemNotFound
 
 director_ns = Namespace('directors')
 
@@ -14,26 +14,23 @@ director_schema = DirectorSchema()
 class DirectorView(Resource):
 
     def get(self):
-        all_directors = director_service.get_all()
+        page= request.args.get('page')
+        try:
+            all_directors = director_service.get_all()
 
-        return directors_schema.dump(all_directors), 200
-
-    @admin_required
-    def post(self):
-        data = request.get_json()
-        director_service.create(data)
-        director_id = data['id']
-        response = jsonify()
-        response.status_code = 201
-        response.headers['location'] = f'/{director_id}'
-        return response
+            return directors_schema.dump(all_directors), 200
+        except ItemNotFound:
+            abort(404)
 
 
-@director_ns.route('/<int:did>')
+
+@director_ns.route('/<int:did>/')
 class DirectorView(Resource):
 
     def get(self, did):
-        director = director_service.get_one(did)
+        try:
+            director = director_service.get_one(did)
 
-        return director_schema.dump(director), 200
-
+            return director_schema.dump(director), 200
+        except ItemNotFound:
+            abort(404)

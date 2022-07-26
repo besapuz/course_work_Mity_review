@@ -1,6 +1,6 @@
-from flask import Flask
+from flask import Flask, render_template
 from flask_cors import CORS
-from flask_restx import api
+from flask_restx import Api
 
 from app.create_db import db
 from app.views.auth import auth_ns
@@ -9,8 +9,6 @@ from app.views.genres import genre_ns
 from app.views.movies import movies_ns
 from app.views.user import user_ns
 
-
-# Нужно для работы с фронтендом
 cors = CORS()
 
 
@@ -18,10 +16,13 @@ def create_app(config):
     app = Flask(__name__)
     app.config.from_object(config)
 
-    cors.init_app(app)
-    db.init_app(app)
-    api.init_app(app)
+    @app.route('/')
+    def index():
+        return render_template('index.html')
 
+    cors.init_app(app)
+    api = Api(app)
+    db.init_app(app)
 
     api.add_namespace(genre_ns)
     api.add_namespace(director_ns)

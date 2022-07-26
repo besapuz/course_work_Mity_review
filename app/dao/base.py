@@ -15,7 +15,7 @@ class BaseDAO:
         return item
 
     def get_all(self, page: str = None, sort: bool = False) -> List[object]:
-        items = self.session.query(self.model).all()
+        items = self.session.query(self.model)
         if sort:
             items = items.order_by(desc(self.model.year))
         if page:
@@ -23,4 +23,3 @@ class BaseDAO:
                 page * current_app.config['ITEMS_PER_PAGE'] - current_app.config['ITEMS_PER_PAGE'])
 
         return items.all()
-

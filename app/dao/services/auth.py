@@ -1,12 +1,12 @@
 import base64
 import hashlib
 import hmac
-from typing import Optional, Dict
+from typing import Optional, Dict, Callable
 import datetime
 import jwt
 from app.dao.serialization.auth import AuthUserSchema
-from flask import current_app
-from app.dao.services.exceptions import UserNotFound, WrongPassword
+from flask import current_app, request, abort
+from app.dao.services.exceptions import UserNotFound, WrongPassword, InvalidToken
 from app.dao.user import UserDAO
 
 
@@ -68,3 +68,28 @@ class AuthService:
             raise WrongPassword
 
         return self.generate_tokens(user)
+
+    def get_email_from_jwt(self, token: str) -> dict:
+        try:
+            data = jwt.decode(token, current_app.config['JWT_SECRET'], current_app.config['JWT_ALGORITHM'])
+            return data.get('email')
+        except Exception:
+            raise InvalidToken
+
+    @staticmethod
+    def auth_required(func: Callable):
+        def wrapper(*args, **kwargs):
+            if 'Authorization' not in request.headers:
+                abort(401)
+
+            data = request.headers['Authorization']
+            token = data.split('Bearer ')[-1]
+            try:
+                jwt.encode(token, current_app.config['JWT_SECRET'], algorithms=current_app.config['JWT_ALGORITHM'])
+            except Exception as e:
+                print('JWT encode exception', e)
+                abort(401)
+
+            return func(*args, **kwargs)
+
+        return wrapper

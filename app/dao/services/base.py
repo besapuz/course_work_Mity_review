@@ -1,13 +1,14 @@
-from typing import TypeVar, Generic, List
+from typing import List
 
-from app.dao.base import BaseDAO
+from app.dao.director import DirectorDAO
+from app.dao.genre import GenreDAO
+from app.dao.movie import MovieDAO
+from app.dao.user import UserDAO
 from app.dao.services.exceptions import ItemNotFound
 
-T = TypeVar('T', bound=BaseDAO)
 
-
-class BaseService(Generic[T]):
-    def __init__(self, dao: T, *args, **kwargs):
+class BaseService:
+    def __init__(self, dao: MovieDAO | GenreDAO | DirectorDAO | UserDAO):
         self.dao = dao
 
     def get_one(self, item_id: int) -> object:
@@ -16,7 +17,7 @@ class BaseService(Generic[T]):
             raise ItemNotFound
         return item
 
-    def get_all(self, page: str) -> List[object]:
+    def get_all(self, page: str = None) -> List[object]:
         items = self.dao.get_all(page, sort=False)
 
         if not items:
