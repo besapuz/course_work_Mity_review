@@ -6,7 +6,7 @@ from werkzeug.exceptions import MethodNotAllowed
 
 from app.dao.models.user import User
 from app.dao.services.base import BaseService
-from app.dao.services.exceptions import UserNotFound
+from app.dao.services.exceptions import UserNotFound, WrongPassword
 from app.dao.user import UserDAO
 from flask import current_app
 
@@ -47,20 +47,19 @@ class UserService(BaseService):
 
         return hmac.compare_digest(password_hash, hash_digest)
 
-    def update_passwords(self, email: str, password_old: str, password_new: str) -> None:
-        user = self.get_by_email(email)
-        data = {'password': self.get_hash(password_new)}
-        self.dao.update_by_email(data, email)
-
     def update_password(self, data: dict, email: str) -> None:
+
         user = self.get_by_email(email)
         current_password = data.get('old_password')
         new_password = data.get('new_password')
 
         if None in [current_password, new_password]:
             raise MethodNotAllowed
-        data = {
-            'password': self.get_hash(current_password)
 
+        if not self.compare_passwords(user.password_hash, current_password):
+            raise WrongPassword
+
+        data = {
+            'password': self.get_hash(new_password)
         }
         self.dao.update_by_email(data, email)

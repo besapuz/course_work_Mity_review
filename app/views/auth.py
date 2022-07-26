@@ -1,6 +1,6 @@
 from flask import request
 from flask_restx import Namespace, Resource, abort
-from app.container import auth_service, user_service
+from app.container import auth_service
 from app.dao.serialization.auth import AuthRegisterRequest
 from app.dao.services.exceptions import ItemNotFound, WrongPassword
 
@@ -24,7 +24,7 @@ class AuthView(Resource):
 @auth_ns.route('/login/')
 class LoginView(Resource):
     def post(self):
-        # Get and check credentials passed
+
         credentials = {
             'email': request.json.get('email'),
             'password': request.json.get('password')
@@ -32,7 +32,7 @@ class LoginView(Resource):
         if None in credentials.values():
             abort(400, 'Not valid data passed')
 
-        # Generate tokens
+
         try:
             tokens = auth_service.generate_tokens(credentials)
             return tokens, 201

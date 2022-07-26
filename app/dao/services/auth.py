@@ -76,6 +76,7 @@ class AuthService:
         except Exception:
             raise InvalidToken
 
+
     @staticmethod
     def auth_required(func: Callable):
         def wrapper(*args, **kwargs):
