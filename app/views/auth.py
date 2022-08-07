@@ -29,7 +29,7 @@ class AuthView(Resource):
             abort(400, 'User already exists')
 
 
-@auth_ns.route('/login/')
+@auth_ns.route('/login')
 class LoginView(Resource):
     def post(self):
 

@@ -6,7 +6,7 @@ from app.container import user_service, auth_service
 from app.dao.models.user import UserSchema
 from app.dao.services.exceptions import UserNotFound, WrongPassword, ValidationError
 
-user_ns = Namespace('users')
+user_ns = Namespace('user')
 
 users_schema = UserSchema(many=True)
 user_schema = UserSchema()
@@ -14,14 +14,13 @@ user_schema = UserSchema()
 
 @user_ns.route('/')
 class UserView(Resource):
-    @auth_service.auth_required
+    # @auth_service.auth_required
     def get(self):
         try:
             auth_data = request.headers['Authorization']
             token = auth_data.split("Bearer ")[-1]
             email = auth_service.get_email_from_jwt(token)
 
-            user = user_service.get_by_email(email)
             user = user_service.get_by_email(email)
             user_dict = user_schema.dump(user)
             return user_dict, 200
