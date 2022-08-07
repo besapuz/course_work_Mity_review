@@ -3,7 +3,7 @@ from app.create_db import db
 from app.dao.models.base import BaseModel
 
 
-class Movie(BaseModel):
+class Movie(BaseModel, db.Model):
     __tablename__ = 'movie'
     title = db.Column(db.String(255), unique=True)
     description = db.Column(db.String(255))
@@ -11,6 +11,7 @@ class Movie(BaseModel):
     year = db.Column(db.Integer)
     rating = db.Column(db.Integer)
     genre_id = db.Column(db.Integer, db.ForeignKey("genre.id"))
+
     genre = db.relationship("Genre")
     director_id = db.Column(db.Integer, db.ForeignKey("director.id"))
 

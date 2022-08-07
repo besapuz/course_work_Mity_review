@@ -21,5 +21,10 @@ class UserAlreadyExists(BaseServiceError):
 class ItemNotFound(BaseServiceError):
     pass
 
+
 class InvalidToken(BaseServiceError):
+    pass
+
+
+class ValidationError(BaseServiceError):
     pass

@@ -26,4 +26,4 @@ user_dao = UserDAO(session=db.session,model=User)
 user_service = UserService(user_dao)
 
 
-auth_service = AuthService(dao=user_dao)
+auth_service = AuthService(user_service=user_service)

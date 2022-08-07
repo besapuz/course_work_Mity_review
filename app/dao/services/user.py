@@ -7,7 +7,7 @@ from werkzeug.exceptions import MethodNotAllowed
 from app.dao.models.user import User
 from app.dao.services.base import BaseService
 from app.dao.services.exceptions import UserNotFound, WrongPassword
-from app.dao.user import UserDAO
+
 from flask import current_app
 
 
@@ -17,17 +17,32 @@ class UserService(BaseService):
         user = self.dao.get_by_email(email)
         return user
 
-    def get_hash(self, password: str) -> str:
-        hashed = hashlib.pbkdf2_hmac(
-            hash_name=current_app.config['HASH_NAME'],
-            salt=current_app.config['PWD_HASH_SALT'],
-            iterations=current_app.config['PWD_HASH_ITERATIONS'],
-            password=password.encode('utf-8'))
-        return base64.b64encode(hashed).decode('utf-8')
+    def create(self, data) -> User:
+        user = self.dao.get_by_email(data.get('email'))
+        data['password'] = self.create_hash(data.get('password'))
+        user = self.dao.create(data)
+        return user
 
-    def create(self, user):
-        user['password'] = self.get_hash(user['password'])
-        self.dao.create(user)
+    def hash_password(self, password: str) -> bytes:
+        hash_digest = self.create_hash(password)
+        encoded_digest = base64.b64encode(hash_digest)
+        return encoded_digest
+
+    def create_hash(self, password: str) -> bytes:
+
+        hash_digest: bytes = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            current_app.config.get('PWD_HASH_SALT'),
+            current_app.config.get('PWD_HASH_ITERATIONS')
+        )
+        return hash_digest
+
+    def compare_passwords(self, password_hash: str, password_passed: str) -> bool:
+
+        passed_hash = self.create_hash(password_passed)
+
+        return hmac.compare_digest(password_hash, passed_hash)
 
     def update_user_info(self, data: dict, email: str) -> None:
         if not self.get_by_email(email):
@@ -36,16 +51,6 @@ class UserService(BaseService):
             self.dao.update_by_email(data, email)
         else:
             raise MethodNotAllowed
-
-    def compare_passwords(self, password_hash: str, other_password: str) -> bool:
-        hash_digest = base64.b64encode(hashlib.pbkdf2_hmac(
-            hash_name=current_app.config['HASH_NAME'],
-            password=other_password.encode('utf-8'),
-            salt=current_app.config['PWD_HASH_SALT'],
-            iterations=current_app.config['PWD_HASH_ITERATIONS']
-        )).decode('utf-8')
-
-        return hmac.compare_digest(password_hash, hash_digest)
 
     def update_password(self, data: dict, email: str) -> None:
 
@@ -56,10 +61,10 @@ class UserService(BaseService):
         if None in [current_password, new_password]:
             raise MethodNotAllowed
 
-        if not self.compare_passwords(user.password_hash, current_password):
+        if not self.compare_passwords(user.password, current_password):
             raise WrongPassword
 
         data = {
-            'password': self.get_hash(new_password)
+            'password': self.create_hash(new_password)
         }
         self.dao.update_by_email(data, email)

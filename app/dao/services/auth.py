@@ -1,73 +1,44 @@
-import base64
-import hashlib
-import hmac
-from typing import Optional, Dict, Callable
+from typing import Callable
 import datetime
 import jwt
-from app.dao.serialization.auth import AuthUserSchema
+
 from flask import current_app, request, abort
-from app.dao.services.exceptions import UserNotFound, WrongPassword, InvalidToken
-from app.dao.user import UserDAO
+from app.dao.services.exceptions import InvalidToken, WrongPassword
+from app.dao.services.user import UserService
 
 
 class AuthService:
-    def __init__(self, dao: UserDAO):
-        self.dao = dao
+    def __init__(self, user_service: UserService):
+        self.user_service = user_service
 
-    def get_hash(self, password: str) -> str:
-        hashed = hashlib.pbkdf2_hmac(
-            hash_name=current_app.config['HASH_NAME'],
-            salt=current_app.config['PWD_HASH_SALT'],
-            iterations=current_app.config['PWD_HASH_ITERATIONS'],
-            password=password.encode('utf-8')
-        )
-        return base64.b64encode(hashed).decode('utf-8')
+    def generate_tokens(self, credentials, is_refresh=False) -> dict:
 
-    def compare_passwords(self, password_1: str, password_2: str) -> bool:
-        return hmac.compare_digest(password_1, password_2)
+        email_passed = credentials.get('email')
+        password_passed = credentials.get('password')
+        user = self.user_service.get_by_email(email_passed)
 
-    def generate_tokens(self, user: AuthUserSchema):
+        if not is_refresh:
 
-        payload = {
-            'email': user['email'],
-            'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=current_app.config['TOKEN_EXPIRE_MINUTES'])
+            password_is_correct = self.user_service.compare_passwords(user.password, password_passed)
+            if not password_is_correct:
+                raise WrongPassword
+
+        data = {
+            'email': user.email,
         }
 
-        access_token = jwt.encode(payload, current_app.config['JWT_SECRET'],
+        access_token = jwt.encode(data, current_app.config['JWT_SECRET'],
                                   current_app.config['JWT_ALGORITHM'])
 
-        payload['exp'] = datetime.datetime.utcnow() + datetime.timedelta(days=current_app.config['TOKEN_EXPIRE_DAYS'])
+        data['exp'] = datetime.datetime.utcnow() + datetime.timedelta(days=current_app.config['TOKEN_EXPIRE_DAYS'])
 
-        refresh_token = jwt.encode(payload, current_app.config['JWT_SECRET'],
+        refresh_token = jwt.encode(data, current_app.config['JWT_SECRET'],
                                    current_app.config['JWT_ALGORITHM'])
 
         return {
             'access_token': access_token,
             'refresh_token': refresh_token
         }
-
-    def register(self, email: str, password: str) -> AuthUserSchema:
-        password_hash = self.get_hash(password)
-        data = {
-            'email': email,
-            'password_hash': password_hash
-
-        }
-        return self.dao.create(data)
-
-    def login(self, email: str, password: str) -> Dict[str, str]:
-
-        user: Optional[AuthUserSchema] = self.dao.get_by_email(email=email)
-
-        if user is None:
-            raise UserNotFound
-        print(user)
-        password_hash = self.get_hash(password)
-
-        if not self.compare_passwords(user['password_hash'], password_hash):
-            raise WrongPassword
-
-        return self.generate_tokens(user)
 
     def get_email_from_jwt(self, token: str) -> dict:
         try:
@@ -76,6 +47,14 @@ class AuthService:
         except Exception:
             raise InvalidToken
 
+    def approve_token(self, refresh_token: str) -> dict:
+
+        credentials = {
+            'email': self.get_email_from_jwt(refresh_token),
+            'password': None
+        }
+        new_tokens = self.generate_tokens(credentials, is_refresh=True)
+        return new_tokens
 
     @staticmethod
     def auth_required(func: Callable):
@@ -86,7 +65,7 @@ class AuthService:
             data = request.headers['Authorization']
             token = data.split('Bearer ')[-1]
             try:
-                jwt.encode(token, current_app.config['JWT_SECRET'], algorithms=current_app.config['JWT_ALGORITHM'])
+                jwt.encode(token, current_app.config['JWT_SECRET'], current_app.config['JWT_ALGORITHM'])
             except Exception as e:
                 print('JWT encode exception', e)
                 abort(401)

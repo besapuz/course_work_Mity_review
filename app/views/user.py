@@ -1,9 +1,10 @@
 from flask import request, abort
 from flask_restx import Namespace, Resource
+from werkzeug.exceptions import MethodNotAllowed
+
 from app.container import user_service, auth_service
 from app.dao.models.user import UserSchema
-from app.dao.services.exceptions import UserNotFound, WrongPassword
-
+from app.dao.services.exceptions import UserNotFound, WrongPassword, ValidationError
 
 user_ns = Namespace('users')
 
@@ -21,7 +22,9 @@ class UserView(Resource):
             email = auth_service.get_email_from_jwt(token)
 
             user = user_service.get_by_email(email)
-            return users_schema.dump(user), 200
+            user = user_service.get_by_email(email)
+            user_dict = user_schema.dump(user)
+            return user_dict, 200
 
         except UserNotFound:
             abort(404, 'User not found')
@@ -32,12 +35,16 @@ class UserView(Resource):
             auth_data = request.headers['Authorization']
             token = auth_data.split("Bearer ")[-1]
             email = auth_service.get_email_from_jwt(token)
-            updated_data = user_schema.dump(request.get_json())
+            updated_data = user_schema.dump(request.json)
             user_service.update_user_info(updated_data, email)
             return "", 200
 
+        except MethodNotAllowed:
+            abort(405, "You're not allowed to change the data passed")
         except UserNotFound:
             abort(404, 'User not found')
+        except ValidationError:
+            abort(400, 'Wrong fields passed')
 
 
 @user_ns.route('/password/')
@@ -47,7 +54,7 @@ class PasswordView(Resource):
         try:
             auth_data = request.headers['Authorization']
             token = auth_data.split("Bearer ")[-1]
-            email = auth_service.get_email_from_token(token)
+            email = auth_service.get_email_from_jwt(token)
             passwords = request.get_json()
             user_service.update_password(passwords, email)
             return "", 200
